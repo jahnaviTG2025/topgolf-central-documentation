@@ -1,0 +1,56 @@
+{
+  "_comment": "Example configuration showing both static and dynamic file pulling",
+  
+  "engineering_repo": "https://github.com/your-org/engineering-repo.git",
+  "engineering_branch": "main",
+  
+  "engineering_paths": {
+    "_comment": "Static file mappings - manually specify each file",
+    "docs/api.md": "docs/engineering/api.md",
+    "docs/architecture.md": "docs/engineering/architecture.md"
+  },
+  
+  "engineering_patterns": [
+    {
+      "_comment": "Dynamic pattern matching - automatically includes new files",
+      "source": "docs/**/*.md",
+      "destination": "docs/engineering/",
+      "recursive": true,
+      "description": "Copy all markdown files recursively from docs/ directory"
+    },
+    {
+      "source": "docs/guides/*.md",
+      "destination": "docs/engineering/guides/",
+      "description": "Copy all markdown files from docs/guides/ directory"
+    }
+  ],
+  
+  "operations_repo": "https://github.com/your-org/operations-repo.git",
+  "operations_branch": "main",
+  
+  "operations_paths": {
+    "_comment": "Static file mappings - manually specify each file",
+    "docs/deployment.md": "docs/operations/deployment.md",
+    "docs/monitoring.md": "docs/operations/monitoring.md"
+  },
+  
+  "operations_patterns": [
+    {
+      "_comment": "Dynamic pattern matching - automatically includes new files",
+      "source": "docs/**/*.md",
+      "destination": "docs/operations/",
+      "recursive": true,
+      "description": "Copy all markdown files recursively from docs/ directory"
+    }
+  ],
+  
+  "temp_dir": ".temp_repos",
+  "exclude_patterns": [
+    "*.tmp",
+    "*.bak",
+    ".*",
+    "README.md",
+    "*_draft.md"
+  ]
+}
+

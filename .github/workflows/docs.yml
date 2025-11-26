@@ -1,0 +1,79 @@
+name: Build and Deploy Documentation
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+  schedule:
+    # Run daily at 2 AM UTC to pull latest content from other repos
+    - cron: '0 2 * * *'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    
+    steps:
+      - name: Checkout central documentation repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Pull content from external repositories
+        env:
+          # Optional: Add authentication tokens if repos are private
+          # These will be empty strings if secrets are not set, which is fine for public repos
+          ENGINEERING_REPO_TOKEN: ${{ secrets.ENGINEERING_REPO_TOKEN || '' }}
+          OPERATIONS_REPO_TOKEN: ${{ secrets.OPERATIONS_REPO_TOKEN || '' }}
+        run: |
+          python scripts/pull_content.py
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Build documentation
+        run: |
+          mkdocs build --strict
+
+      - name: Setup Pages
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./site
+
+      - name: Deploy to GitHub Pages
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Build documentation (PR preview)
+        if: github.event_name == 'pull_request'
+        run: |
+          mkdocs build --strict
+          echo "Documentation built successfully. Review the changes in the PR."

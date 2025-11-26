@@ -1,0 +1,19 @@
+# MkDocs and Core Dependencies
+mkdocs==1.5.3
+mkdocs-material==9.5.3
+
+# MkDocs Plugins
+mkdocs-git-revision-date-localized-plugin==1.2.2
+mkdocs-awesome-pages-plugin==2.9.2
+
+# Markdown Extensions
+pymdown-extensions==10.5
+markdown-include==0.8.1
+
+# AsyncAPI Tools (optional - for AsyncAPI generation)
+# asyncapi-python==0.8.0
+# @asyncapi/cli - Install via npm if needed
+
+# Development Tools
+pyyaml==6.0.1
+
