@@ -1,5 +1,4 @@
-name: Build and Deploy Documentation
-
+name: Build and Deploy Documentation to S3
 on:
   push:
     branches:
@@ -13,67 +12,69 @@ on:
   schedule:
     # Run daily at 2 AM UTC to pull latest content from other repos
     - cron: '0 2 * * *'
-
+env:
+  # S3 Configuration - Update these or use repository secrets
+  AWS_REGION: us-east-2
+  S3_BUCKET: ${{ secrets.S3_BUCKET_NAME }}
+  # CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    
     permissions:
-      contents: write
-      pages: write
+      contents: read
       id-token: write
-    
     steps:
       - name: Checkout central documentation repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
-      - name: Pull content from external repositories
-        env:
-          # Optional: Add authentication tokens if repos are private
-          # These will be empty strings if secrets are not set, which is fine for public repos
-          ENGINEERING_REPO_TOKEN: ${{ secrets.ENGINEERING_REPO_TOKEN || '' }}
-          OPERATIONS_REPO_TOKEN: ${{ secrets.OPERATIONS_REPO_TOKEN || '' }}
-        run: |
-          python scripts/pull_content.py
-
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
+      
       - name: Build documentation
         run: |
           mkdocs build --strict
-
-      - name: Setup Pages
+      - name: Configure AWS credentials
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-        uses: actions/configure-pages@v4
-
-      - name: Upload artifact
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-        uses: actions/upload-pages-artifact@v3
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          path: ./site
-
-      - name: Deploy to GitHub Pages
+          # Option 1: Use OIDC (recommended for GitHub Actions)
+          # role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          # aws-region: ${{ env.AWS_REGION }}
+          # Option 2: Use Access Keys (simpler setup)
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Deploy to S3
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-        id: deployment
-        uses: actions/deploy-pages@v4
-
+        run: |
+          # Sync built site to S3 bucket
+          aws s3 sync ./site s3://${{ env.S3_BUCKET }} \
+            --delete \
+            --cache-control "max-age=86400" \
+            --exclude "*.html" \
+            --exclude "sitemap.xml"
+          # Upload HTML files with shorter cache
+          aws s3 sync ./site s3://${{ env.S3_BUCKET }} \
+            --cache-control "max-age=3600" \
+            --content-type "text/html" \
+            --exclude "*" \
+            --include "*.html"
+          # Upload sitemap
+          aws s3 cp ./site/sitemap.xml s3://${{ env.S3_BUCKET }}/sitemap.xml \
+            --cache-control "max-age=3600" \
+            --content-type "application/xml" || true
+          echo "Documentation deployed to S3 bucket: ${{ env.S3_BUCKET }}"
       - name: Build documentation (PR preview)
         if: github.event_name == 'pull_request'
         run: |
-          mkdocs build --strict
           echo "Documentation built successfully. Review the changes in the PR."
+          echo "Site contents:"
+          ls -la ./site/
+ 
