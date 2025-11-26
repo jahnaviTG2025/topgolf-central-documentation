@@ -13,8 +13,8 @@ This documentation is built using [MkDocs](https://www.mkdocs.org/) with the Mat
 
 Navigate through the documentation using the sidebar to find information about:
 
-- **Engineering**: Technical documentation, APIs, and architecture
-- **Operations**: Deployment, monitoring, and operational guides
+- **Messaging Core**: Technical documentation, APIs, and architecture
+- **Game Technology**: Deployment, monitoring, and operational guides
 - **AsyncAPI**: API specifications and schemas
 
 ## Contributing
@@ -22,15 +22,15 @@ Navigate through the documentation using the sidebar to find information about:
 Documentation is maintained in multiple repositories:
 
 1. **Central Documentation Repo** (this repo): Main structure and cross-repo content
-2. **Engineering Repo**: Technical documentation
-3. **Operations Repo**: Operational documentation
+2. **Messaging Core Repo**: Messaging Core documentation
+3. **Game Technology Repo**: Game Technology documentation
 
 Content from the Engineering and Operations repos is automatically pulled during the build process.
 
 ## Quick Links
 
 - [Getting Started Guide](getting-started/overview.md)
-- [Engineering Documentation](engineering/index.md)
-- [Operations Documentation](operations/index.md)
+- [Messaging Core Documentation](messaging-core/index.md)
+- [Game Technology Documentation](game-technology/index.md)
 - [AsyncAPI Specifications](asyncapi/index.md)
 
