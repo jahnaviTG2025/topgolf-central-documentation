@@ -9,7 +9,6 @@ import os
 import shutil
 import subprocess
 import sys
-
 import fnmatch
 from pathlib import Path
 
@@ -28,7 +27,7 @@ def load_config():
             config = json.load(f)
         
         # Validate required fields
-        required_fields = ["engineering_repo", "operations_repo"]
+        required_fields = ["messaging_core_repo", "virtual_golf_game_api_repo"]
         for field in required_fields:
             if field not in config:
                 print(f"Warning: Missing field '{field}' in config.json")
@@ -230,6 +229,44 @@ def copy_files(source_repo_path, file_mapping, repo_name):
     return copied_count
 
 
+def determine_repos_to_pull(config):
+    """
+    Determine which repositories to pull based on environment variables.
+    Returns a dict with flags for each repo.
+    """
+    # Get the triggering repository from environment (set by GitHub Actions)
+    trigger_repo = os.environ.get("TRIGGER_REPOSITORY", "").lower()
+    
+    # Default: pull from both repos (for cron, push, manual triggers)
+    pull_messaging_core = True
+    pull_virtual_golf_game_api = True
+    
+    # If triggered by repository_dispatch, only pull from the triggering repo
+    if trigger_repo:
+        print(f"📥 Triggered by repository: {trigger_repo}")
+        
+        # Check if it's messaging-core
+        if "messaging-core" in trigger_repo or "messaging_core" in trigger_repo:
+            pull_messaging_core = True
+            pull_virtual_golf_game_api = False
+            print("  → Will pull from: messaging-core only")
+        # Check if it's virtual-golf-game-api
+        elif "virtual-golf-game-api" in trigger_repo or "virtual_golf_game_api" in trigger_repo:
+            pull_messaging_core = False
+            pull_virtual_golf_game_api = True
+            print("  → Will pull from: virtual-golf-game-api only")
+        else:
+            # Unknown repo, pull from both to be safe
+            print(f"  ⚠️  Unknown repository '{trigger_repo}', will pull from both repos")
+    else:
+        print("📥 No specific repository trigger detected, will pull from both repos")
+    
+    return {
+        "messaging_core": pull_messaging_core,
+        "virtual_golf_game_api": pull_virtual_golf_game_api
+    }
+
+
 def main():
     """Main function to pull content from repositories"""
     print("=" * 60)
@@ -239,6 +276,9 @@ def main():
     # Load configuration
     config = load_config()
     
+    # Determine which repos to pull based on trigger
+    repos_to_pull = determine_repos_to_pull(config)
+    
     # Setup temporary directory
     temp_dir = config.get("temp_dir", ".temp_repos")
     temp_path = ensure_temp_dir(temp_dir)
@@ -246,78 +286,82 @@ def main():
     total_copied = 0
     
     # Get authentication tokens from environment variables (for GitHub Actions)
-    eng_token = os.environ.get("ENGINEERING_REPO_TOKEN")
-    ops_token = os.environ.get("OPERATIONS_REPO_TOKEN")
+    messaging_core_token = os.environ.get("MESSAGING_CORE_REPO_TOKEN")
+    virtual_golf_game_api_token = os.environ.get("VIRTUAL_GOLF_GAME_API_REPO_TOKEN")
     
-    # Process Engineering repository
-    if "engineering_repo" in config:
-        print(f"\n[1/2] Processing Engineering Repository...")
-        eng_repo_path = clone_or_update_repo(
-            config["engineering_repo"],
-            config.get("engineering_branch", "main"),
+    # Process messaging-core repository
+    if "messaging_core_repo" in config and repos_to_pull["messaging_core"]:
+        print(f"\n[1/2] Processing messaging-core Repository...")
+        messaging_core_repo_path = clone_or_update_repo(
+            config["messaging_core_repo"],
+            config.get("messaging_core_branch", "main"),
             temp_path,
             "engineering",
-            eng_token
+            messaging_core_token
         )
         
         # Process static file mappings (backward compatibility)
-        if "engineering_paths" in config and config["engineering_paths"]:
+        if "messaging_core_paths" in config and config["messaging_core_paths"]:
             print("  Copying static file mappings...")
             copied = copy_files(
-                eng_repo_path,
-                config["engineering_paths"],
-                "Engineering"
+                messaging_core_repo_path,
+                config["messaging_core_paths"],
+                "messaging-core"
             )
             total_copied += copied
         
         # Process pattern-based file copying (dynamic)
-        if "engineering_patterns" in config and config["engineering_patterns"]:
+        if "messaging_core_patterns" in config and config["messaging_core_patterns"]:
             print("  Copying files using patterns...")
             exclude_patterns = config.get("exclude_patterns", [])
             copied = copy_files_by_pattern(
-                eng_repo_path,
-                config["engineering_patterns"],
+                messaging_core_repo_path,
+                config["messaging_core_patterns"],
                 exclude_patterns,
-                "Engineering"
+                "messaging-core"
             )
             total_copied += copied
+    elif repos_to_pull["messaging_core"]:
+        print("\n⚠️  Warning: messaging-core repository not configured in config.json")
     else:
-        print("\n⚠️  Warning: Engineering repository not configured in config.json")
+        print("\n⏭️  Skipping messaging-core (not triggered by this repository)")
     
-    # Process Operations repository
-    if "operations_repo" in config:
-        print(f"\n[2/2] Processing Operations Repository...")
-        ops_repo_path = clone_or_update_repo(
-            config["operations_repo"],
-            config.get("operations_branch", "main"),
+    # Process virtual-golf-game-api repository
+    if "virtual_golf_game_api_repo" in config and repos_to_pull["virtual_golf_game_api"]:
+        print(f"\n[2/2] Processing virtual-golf-game-api Repository...")
+        virtual_golf_game_api_repo_path = clone_or_update_repo(
+            config["virtual_golf_game_api_repo"],
+            config.get("virtual_golf_game_api_branch", "main"),
             temp_path,
             "operations",
-            ops_token
+            virtual_golf_game_api_token
         )
         
         # Process static file mappings (backward compatibility)
-        if "operations_paths" in config and config["operations_paths"]:
+        if "virtual_golf_game_api_paths" in config and config["virtual_golf_game_api_paths"]:
             print("  Copying static file mappings...")
             copied = copy_files(
-                ops_repo_path,
-                config["operations_paths"],
-                "Operations"
+                virtual_golf_game_api_repo_path,
+                config["virtual_golf_game_api_paths"],
+                "virtual-golf-game-api"
             )
             total_copied += copied
         
         # Process pattern-based file copying (dynamic)
-        if "operations_patterns" in config and config["operations_patterns"]:
+        if "virtual_golf_game_api_patterns" in config and config["virtual_golf_game_api_patterns"]:
             print("  Copying files using patterns...")
             exclude_patterns = config.get("exclude_patterns", [])
             copied = copy_files_by_pattern(
-                ops_repo_path,
-                config["operations_patterns"],
+                virtual_golf_game_api_repo_path,
+                config["virtual_golf_game_api_patterns"],
                 exclude_patterns,
-                "Operations"
+                "virtual-golf-game-api"
             )
             total_copied += copied
+    elif repos_to_pull["virtual_golf_game_api"]:
+        print("\n⚠️  Warning: virtual-golf-game-api repository not configured in config.json")
     else:
-        print("\n⚠️  Warning: Operations repository not configured in config.json")
+        print("\n⏭️  Skipping virtual-golf-game-api (not triggered by this repository)")
     
     # Cleanup temporary directory
     print(f"\nCleaning up temporary files...")
