@@ -18,8 +18,9 @@ on:
   repository_dispatch:
     types: [trigger-docs-update]
   schedule:
-    # Run daily at  AM UTC to pull latest content from other repos
-    - cron: '0 2 * * *'
+    # Run weekly on Monday at 2 AM UTC to pull latest content from all repos
+    # (Automatic triggers handle immediate updates, this is a fallback)
+    - cron: '0 2 * * 1'
 
 env:
   # S3 Configuration - Update these or use repository secrets
@@ -36,7 +37,7 @@ jobs:
       id-token: write
     
     steps:
-      - name: Checkout c2entral documentation repo
+      - name: Checkout central documentation repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -68,11 +69,25 @@ jobs:
             echo "Scheduled daily update"
           fi
 
+      - name: Determine trigger repository
+        id: trigger_repo
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            TRIGGER_REPO="${{ github.event.client_payload.repository }}"
+            echo "repository=$TRIGGER_REPO" >> $GITHUB_OUTPUT
+            echo "Triggered by repository: $TRIGGER_REPO"
+          else
+            echo "repository=" >> $GITHUB_OUTPUT
+            echo "Not triggered by repository_dispatch, will pull from all repos"
+          fi
+
       - name: Pull content from external repositories
         env:
           # Optional: Add authentication tokens if repos are private
           MESSAGING_CORE_REPO_TOKEN: ${{ secrets.MESSAGING_CORE_REPO_TOKEN || '' }}
           VIRTUAL_GOLF_GAME_API_REPO_TOKEN: ${{ secrets.VIRTUAL_GOLF_GAME_API_REPO_TOKEN || '' }}
+          # Pass the triggering repository to the script
+          TRIGGER_REPOSITORY: ${{ steps.trigger_repo.outputs.repository }}
         run: |
           python scripts/pull_content.py
 
