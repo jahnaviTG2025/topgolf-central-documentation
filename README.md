@@ -389,4 +389,5 @@ git push
 
 **Need help?** Check the troubleshooting section above or review the configuration guides in the `scripts/` directory.
 
-**Last Updated**: 2025-01-23
+**Last Updated**: 01-12-2026
+
