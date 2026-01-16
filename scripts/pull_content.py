@@ -50,29 +50,59 @@ def ensure_temp_dir(temp_dir):
     return temp_path
 
 
-def clone_or_update_repo(repo_url, branch, temp_path, repo_name, token=None):
-    """Clone or update a repository"""
+def clone_or_update_repo(repo_url, branch, temp_path, repo_name, token=None, commit_sha=None):
+    """Clone or update a repository, optionally checking out a specific commit"""
     repo_path = temp_path / repo_name
     
-    if repo_path.exists():
-        print(f"Updating {repo_name} repository...")
+    # Always clone fresh when using specific commit SHA
+    if commit_sha:
+        if repo_path.exists():
+            shutil.rmtree(repo_path)
+        print(f"Cloning {repo_name} repository to checkout commit {commit_sha[:7]}...")
+        clone_repo(repo_url, branch, repo_path, token)
+        
+        # Checkout the specific commit
         try:
+            env = os.environ.copy()
+            env['GIT_TERMINAL_PROMPT'] = '0'
+            env['GIT_ASKPASS'] = 'echo'
             result = subprocess.run(
-                ["git", "pull", "origin", branch],
+                ["git", "checkout", commit_sha],
                 cwd=repo_path,
                 check=True,
                 capture_output=True,
-                text=True
+                text=True,
+                env=env
             )
+            print(f"  ✅ Checked out commit {commit_sha[:7]}")
         except subprocess.CalledProcessError as e:
             error_msg = e.stderr if isinstance(e.stderr, str) else e.stderr.decode('utf-8', errors='ignore')
-            print(f"Warning: Failed to update {repo_name} repo: {error_msg}")
-            print(f"Attempting fresh clone...")
-            shutil.rmtree(repo_path)
-            clone_repo(repo_url, branch, repo_path, token)
+            print(f"  ⚠️  Warning: Failed to checkout commit {commit_sha[:7]}: {error_msg}")
+            print(f"  → Will use latest branch ({branch}) instead")
     else:
-        print(f"Cloning {repo_name} repository...")
-        clone_repo(repo_url, branch, repo_path, token)
+        # Standard clone/update behavior for scheduled or manual triggers
+        if repo_path.exists():
+            print(f"Updating {repo_name} repository...")
+            try:
+                env = os.environ.copy()
+                env['GIT_TERMINAL_PROMPT'] = '0'
+                result = subprocess.run(
+                    ["git", "pull", "origin", branch],
+                    cwd=repo_path,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env=env
+                )
+            except subprocess.CalledProcessError as e:
+                error_msg = e.stderr if isinstance(e.stderr, str) else e.stderr.decode('utf-8', errors='ignore')
+                print(f"Warning: Failed to update {repo_name} repo: {error_msg}")
+                print(f"Attempting fresh clone...")
+                shutil.rmtree(repo_path)
+                clone_repo(repo_url, branch, repo_path, token)
+        else:
+            print(f"Cloning {repo_name} repository...")
+            clone_repo(repo_url, branch, repo_path, token)
     
     return repo_path
 
@@ -154,6 +184,138 @@ def should_exclude_file(file_path, exclude_patterns):
         if fnmatch.fnmatch(file_name, pattern) or fnmatch.fnmatch(file_path_str, pattern):
             return True
     return False
+
+
+def match_file_to_pattern(file_path, pattern_config, exclude_patterns):
+    """Check if a file matches a pattern configuration"""
+    source_pattern = pattern_config.get("source")
+    
+    # Convert Path object to string and normalize
+    if isinstance(file_path, Path):
+        file_path_str = str(file_path).replace("\\", "/")
+    else:
+        file_path_str = str(file_path).replace("\\", "/")
+    
+    # Normalize pattern
+    source_pattern = source_pattern.replace("\\", "/")
+    
+    # Check exclusions first (convert Path to string for exclusion check)
+    if should_exclude_file(Path(file_path_str) if not isinstance(file_path, Path) else file_path, exclude_patterns):
+        return False
+    
+    # Handle glob patterns
+    if "*" in source_pattern or "?" in source_pattern:
+        # For recursive patterns (**)
+        if "**" in source_pattern:
+            # Convert ** pattern to fnmatch pattern
+            # docs/**/*.md should match docs/any/path/file.md
+            pattern_parts = source_pattern.split("**")
+            if len(pattern_parts) == 2:
+                prefix = pattern_parts[0].rstrip("/")
+                suffix = pattern_parts[1].lstrip("/")
+                if not prefix:
+                    # **/*.md - match any file with that extension
+                    if fnmatch.fnmatch(file_path_str, f"*{suffix}") or fnmatch.fnmatch(file_path.name, suffix):
+                        return True
+                elif file_path_str.startswith(prefix):
+                    # docs/**/*.md - match docs/.../*.md
+                    remaining = file_path_str[len(prefix):].lstrip("/")
+                    if fnmatch.fnmatch(remaining, suffix) or fnmatch.fnmatch(remaining, f"*/{suffix}") or fnmatch.fnmatch(remaining, f"**/{suffix}"):
+                        return True
+            else:
+                # Multiple **, use simpler matching
+                if fnmatch.fnmatch(file_path_str, source_pattern.replace("**", "*")):
+                    return True
+        else:
+            # Simple glob pattern (no **)
+            if fnmatch.fnmatch(file_path_str, source_pattern):
+                return True
+    else:
+        # Exact match (no wildcards)
+        if file_path_str == source_pattern or file_path.name == source_pattern:
+            return True
+        # Also check if it's a directory pattern match
+        if source_pattern.endswith("/") and file_path_str.startswith(source_pattern.rstrip("/")):
+            return True
+    
+    return False
+
+
+def copy_changed_files(source_repo_path, changed_files_list, patterns, exclude_patterns, repo_name):
+    """Copy only the changed files that match the patterns"""
+    base_path = Path(__file__).parent.parent
+    docs_path = base_path / "docs"
+    
+    if not changed_files_list:
+        print("  [INFO] No changed files list provided")
+        return 0
+    
+    # Parse changed files (comma-separated)
+    changed_files = [f.strip() for f in changed_files_list.split(",") if f.strip()]
+    
+    if not changed_files:
+        print("  [INFO] No changed files to process")
+        return 0
+    
+    print(f"  Processing {len(changed_files)} changed file(s)...")
+    
+    copied_count = 0
+    matched_files = []
+    
+    # Find which changed files match our patterns
+    for changed_file in changed_files:
+        # Normalize path (handle both Windows and Unix paths)
+        changed_file_normalized = changed_file.replace("\\", "/")
+        file_path = source_repo_path / changed_file_normalized
+        
+        # Check if file exists (might have been deleted)
+        if not file_path.exists():
+            print(f"  [INFO] File no longer exists (deleted?): {changed_file}")
+            # TODO: Could delete from destination if needed
+            continue
+        
+        # Get relative path for pattern matching (relative to repo root)
+        try:
+            relative_path = file_path.relative_to(source_repo_path)
+        except ValueError:
+            # If path is not relative, try to make it relative
+            relative_path = Path(changed_file_normalized)
+        
+        # Check if file matches any pattern
+        for pattern_config in patterns:
+            dest_base = pattern_config.get("destination", "")
+            
+            # Use the actual file path for matching (pathlib Path object)
+            if match_file_to_pattern(relative_path, pattern_config, exclude_patterns):
+                matched_files.append((file_path, dest_base, changed_file_normalized))
+                break
+    
+    # Copy matched files
+    for source_file, dest_base, relative_path in matched_files:
+        # Determine destination path
+        if dest_base.endswith("/") or dest_base == "":
+            # Destination is a directory, preserve relative path structure
+            dest_file = docs_path / dest_base / relative_path
+        else:
+            # Destination is a specific file path
+            dest_file = docs_path / dest_base
+        
+        # Ensure destination directory exists
+        dest_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Copy file
+        try:
+            shutil.copy2(source_file, dest_file)
+            print(f"  [OK] Copied {relative_path} -> {dest_file.relative_to(docs_path)}")
+            copied_count += 1
+        except Exception as e:
+            print(f"  [ERROR] Failed to copy {relative_path}: {e}")
+    
+    if not matched_files:
+        print(f"  [INFO] No changed files matched the configured patterns")
+        print(f"  Changed files: {', '.join(changed_files[:5])}{'...' if len(changed_files) > 5 else ''}")
+    
+    return copied_count
 
 
 def copy_files_by_pattern(source_repo_path, patterns, exclude_patterns, repo_name):
@@ -320,38 +482,71 @@ def main():
     messaging_core_token = os.environ.get("MESSAGING_CORE_REPO_TOKEN")
     virtual_golf_game_api_token = os.environ.get("VIRTUAL_GOLF_GAME_API_REPO_TOKEN")
     
+    # Get commit info if triggered by repository_dispatch
+    trigger_commit = os.environ.get("TRIGGER_COMMIT", "")
+    trigger_changed_files = os.environ.get("TRIGGER_CHANGED_FILES", "")
+    trigger_repo = os.environ.get("TRIGGER_REPOSITORY", "").lower()
+    
+    # Determine if we should use commit-based pulling (only for repository_dispatch)
+    use_commit_based = bool(trigger_commit and trigger_changed_files)
+    
+    if use_commit_based:
+        print(f"\n📋 Commit-based pulling mode enabled")
+        print(f"   Commit: {trigger_commit[:7] if trigger_commit else 'N/A'}")
+        print(f"   Changed files: {len(trigger_changed_files.split(',')) if trigger_changed_files else 0} file(s)")
+    
     # Process messaging-core repository
     if "messaging_core_repo" in config and repos_to_pull["messaging_core"]:
         print(f"\n[1/2] Processing messaging-core Repository...")
+        
+        # Get commit SHA if this is the triggering repo
+        commit_sha = trigger_commit if use_commit_based and "messaging-core" in trigger_repo else None
+        changed_files_list = trigger_changed_files if use_commit_based and "messaging-core" in trigger_repo else None
+        
         messaging_core_repo_path = clone_or_update_repo(
             config["messaging_core_repo"],
             config.get("messaging_core_branch", "main"),
             temp_path,
             "engineering",
-            messaging_core_token
+            messaging_core_token,
+            commit_sha=commit_sha
         )
         
-        # Process static file mappings (backward compatibility)
-        if "messaging_core_paths" in config and config["messaging_core_paths"]:
-            print("  Copying static file mappings...")
-            copied = copy_files(
-                messaging_core_repo_path,
-                config["messaging_core_paths"],
-                "messaging-core"
-            )
-            total_copied += copied
-        
-        # Process pattern-based file copying (dynamic)
-        if "messaging_core_patterns" in config and config["messaging_core_patterns"]:
-            print("  Copying files using patterns...")
+        # Use commit-based copying if available, otherwise use pattern-based
+        if changed_files_list and "messaging_core_patterns" in config and config["messaging_core_patterns"]:
+            print("  Copying only changed files that match patterns...")
             exclude_patterns = config.get("exclude_patterns", [])
-            copied = copy_files_by_pattern(
+            copied = copy_changed_files(
                 messaging_core_repo_path,
+                changed_files_list,
                 config["messaging_core_patterns"],
                 exclude_patterns,
                 "messaging-core"
             )
             total_copied += copied
+        else:
+            # Fallback to pattern-based or static mapping (for scheduled/push/manual triggers)
+            # Process static file mappings (backward compatibility)
+            if "messaging_core_paths" in config and config["messaging_core_paths"]:
+                print("  Copying static file mappings...")
+                copied = copy_files(
+                    messaging_core_repo_path,
+                    config["messaging_core_paths"],
+                    "messaging-core"
+                )
+                total_copied += copied
+            
+            # Process pattern-based file copying (dynamic)
+            if "messaging_core_patterns" in config and config["messaging_core_patterns"]:
+                print("  Copying files using patterns...")
+                exclude_patterns = config.get("exclude_patterns", [])
+                copied = copy_files_by_pattern(
+                    messaging_core_repo_path,
+                    config["messaging_core_patterns"],
+                    exclude_patterns,
+                    "messaging-core"
+                )
+                total_copied += copied
     elif repos_to_pull["messaging_core"]:
         print("\n⚠️  Warning: messaging-core repository not configured in config.json")
     else:
@@ -360,35 +555,55 @@ def main():
     # Process virtual-golf-game-api repository
     if "virtual_golf_game_api_repo" in config and repos_to_pull["virtual_golf_game_api"]:
         print(f"\n[2/2] Processing virtual-golf-game-api Repository...")
+        
+        # Get commit SHA if this is the triggering repo
+        commit_sha = trigger_commit if use_commit_based and "virtual-golf-game-api" in trigger_repo else None
+        changed_files_list = trigger_changed_files if use_commit_based and "virtual-golf-game-api" in trigger_repo else None
+        
         virtual_golf_game_api_repo_path = clone_or_update_repo(
             config["virtual_golf_game_api_repo"],
             config.get("virtual_golf_game_api_branch", "main"),
             temp_path,
             "operations",
-            virtual_golf_game_api_token
+            virtual_golf_game_api_token,
+            commit_sha=commit_sha
         )
         
-        # Process static file mappings (backward compatibility)
-        if "virtual_golf_game_api_paths" in config and config["virtual_golf_game_api_paths"]:
-            print("  Copying static file mappings...")
-            copied = copy_files(
-                virtual_golf_game_api_repo_path,
-                config["virtual_golf_game_api_paths"],
-                "virtual-golf-game-api"
-            )
-            total_copied += copied
-        
-        # Process pattern-based file copying (dynamic)
-        if "virtual_golf_game_api_patterns" in config and config["virtual_golf_game_api_patterns"]:
-            print("  Copying files using patterns...")
+        # Use commit-based copying if available, otherwise use pattern-based
+        if changed_files_list and "virtual_golf_game_api_patterns" in config and config["virtual_golf_game_api_patterns"]:
+            print("  Copying only changed files that match patterns...")
             exclude_patterns = config.get("exclude_patterns", [])
-            copied = copy_files_by_pattern(
+            copied = copy_changed_files(
                 virtual_golf_game_api_repo_path,
+                changed_files_list,
                 config["virtual_golf_game_api_patterns"],
                 exclude_patterns,
                 "virtual-golf-game-api"
             )
             total_copied += copied
+        else:
+            # Fallback to pattern-based or static mapping (for scheduled/push/manual triggers)
+            # Process static file mappings (backward compatibility)
+            if "virtual_golf_game_api_paths" in config and config["virtual_golf_game_api_paths"]:
+                print("  Copying static file mappings...")
+                copied = copy_files(
+                    virtual_golf_game_api_repo_path,
+                    config["virtual_golf_game_api_paths"],
+                    "virtual-golf-game-api"
+                )
+                total_copied += copied
+            
+            # Process pattern-based file copying (dynamic)
+            if "virtual_golf_game_api_patterns" in config and config["virtual_golf_game_api_patterns"]:
+                print("  Copying files using patterns...")
+                exclude_patterns = config.get("exclude_patterns", [])
+                copied = copy_files_by_pattern(
+                    virtual_golf_game_api_repo_path,
+                    config["virtual_golf_game_api_patterns"],
+                    exclude_patterns,
+                    "virtual-golf-game-api"
+                )
+                total_copied += copied
     elif repos_to_pull["virtual_golf_game_api"]:
         print("\n⚠️  Warning: virtual-golf-game-api repository not configured in config.json")
     else:
