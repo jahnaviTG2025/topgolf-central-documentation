@@ -81,32 +81,63 @@ def clone_repo(repo_url, branch, target_path, token=None):
     """Clone a repository to a specific path"""
     try:
         # If token is provided, inject it into the URL for authentication
-        if token:
+        authenticated_url = repo_url
+        if token and token.strip():
             if repo_url.startswith("https://"):
-                # Insert token into HTTPS URL
-                repo_url = repo_url.replace("https://", f"https://{token}@")
+                # For GitHub, use token as username in HTTPS URL
+                # Format: https://<token>@github.com/org/repo.git
+                if "github.com" in repo_url:
+                    authenticated_url = repo_url.replace("https://", f"https://{token}@")
+                else:
+                    # For other Git hosts, use token as username
+                    authenticated_url = repo_url.replace("https://", f"https://{token}@")
             elif repo_url.startswith("git@"):
                 # For SSH URLs, token won't work - use SSH keys instead
                 print(f"Warning: Token authentication not supported for SSH URLs. Using SSH keys.")
+                authenticated_url = repo_url
+        else:
+            # Check if this is a private repository that needs authentication
+            if "github.com" in repo_url and not repo_url.startswith("git@"):
+                print(f"⚠️  Warning: No authentication token provided for {repo_url}")
+                print(f"   If this is a private repository, set MESSAGING_CORE_REPO_TOKEN or VIRTUAL_GOLF_GAME_API_REPO_TOKEN")
+        
+        # Configure Git to not prompt for credentials
+        env = os.environ.copy()
+        env['GIT_TERMINAL_PROMPT'] = '0'
+        env['GIT_ASKPASS'] = 'echo'
         
         result = subprocess.run(
-            ["git", "clone", "-b", branch, "--depth", "1", repo_url, str(target_path)],
+            ["git", "clone", "-b", branch, "--depth", "1", authenticated_url, str(target_path)],
             check=True,
             capture_output=True,
-            text=True
+            text=True,
+            env=env
         )
+        print(f"  ✅ Successfully cloned {repo_url}")
         return True
     except subprocess.CalledProcessError as e:
-        print(f"Error: Failed to clone repository {repo_url}")
+        print(f"❌ Error: Failed to clone repository {repo_url}")
         error_msg = e.stderr if isinstance(e.stderr, str) else e.stderr.decode('utf-8', errors='ignore')
+        stdout_msg = e.stdout if isinstance(e.stdout, str) else e.stdout.decode('utf-8', errors='ignore') if e.stdout else ""
         print(f"Error details: {error_msg}")
+        if stdout_msg:
+            print(f"Output: {stdout_msg}")
         
-        # Check if it's an authentication error
-        if "authentication" in error_msg.lower() or "permission" in error_msg.lower():
-            print("\n💡 Tip: If this is a private repository, you may need to:")
-            print("   1. Configure SSH keys, or")
-            print("   2. Use a personal access token in the repository URL, or")
-            print("   3. Set up repository secrets in GitHub Actions")
+        # Check for specific authentication errors
+        error_lower = error_msg.lower()
+        if "could not read username" in error_lower or "authentication" in error_lower or "permission" in error_lower or "credential" in error_lower:
+            print("\n🔐 Authentication Error Detected")
+            print("💡 Solution: Add GitHub Personal Access Token as repository secret")
+            print("\n   For messaging-core repository:")
+            print("   - Secret name: MESSAGING_CORE_REPO_TOKEN")
+            print("   - Token scopes needed: 'repo' (for private repos)")
+            print("\n   For virtual-golf-game-api repository:")
+            print("   - Secret name: VIRTUAL_GOLF_GAME_API_REPO_TOKEN")
+            print("   - Token scopes needed: 'repo' (for private repos)")
+            print("\n   Steps:")
+            print("   1. Create token: GitHub → Settings → Developer settings → Personal access tokens")
+            print("   2. Add token to central documentation repo → Settings → Secrets → Actions")
+            print("   3. Make sure token has 'repo' scope if repositories are private")
         
         sys.exit(1)
 
