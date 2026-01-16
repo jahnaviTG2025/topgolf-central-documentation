@@ -1,42 +1,23 @@
 {
-  "_comment": "Configuration supports both static file mappings and dynamic pattern matching",
-  "_comment2": "See scripts/CONFIG_GUIDE.md for detailed pattern documentation",
-  
-  "engineering_repo": "https://github.com/your-org/engineering-repo.git",
-  "engineering_branch": "main",
-  
-  "engineering_paths": {
-    "_comment": "Static mappings: Manually specify each file (backward compatible)",
-    "docs/api.md": "docs/engineering/api.md",
-    "docs/architecture.md": "docs/engineering/architecture.md"
-  },
-  
-  "engineering_patterns": [
+  "messaging_core_repo": "https://github.com/TopGolf/messaging-core.git",
+  "messaging_core_branch": "main",
+  "messaging_core_patterns": [
     {
-      "_comment": "Dynamic patterns: Automatically discover files using glob patterns",
       "source": "docs/**/*.md",
       "destination": "docs/engineering/",
       "recursive": true,
-      "description": "Copy all markdown files recursively from docs/ directory"
+      "description": "Copy all markdown files from messaging-core docs/"
     }
   ],
   
-  "operations_repo": "https://github.com/your-org/operations-repo.git",
-  "operations_branch": "main",
-  
-  "operations_paths": {
-    "_comment": "Static mappings: Manually specify each file (backward compatible)",
-    "docs/deployment.md": "docs/operations/deployment.md",
-    "docs/monitoring.md": "docs/operations/monitoring.md"
-  },
-  
-  "operations_patterns": [
+  "virtual_golf_game_api_repo": "https://github.com/TopGolf/virtual-golf-game-api.git",
+  "virtual_golf_game_api_branch": "main",
+  "virtual_golf_game_api_patterns": [
     {
-      "_comment": "Dynamic patterns: Automatically discover files using glob patterns",
       "source": "docs/**/*.md",
       "destination": "docs/operations/",
       "recursive": true,
-      "description": "Copy all markdown files recursively from docs/ directory"
+      "description": "Copy all markdown files from virtual-golf-game-api docs/"
     }
   ],
   
