@@ -1,6 +1,1 @@
-# This file configures the awesome-pages plugin for navigation.
-# Keep a stable top-level order and auto-include new sections.
-nav:
-  - index.md
-  - ...
 
