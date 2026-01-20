@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+"""
+Script to pull content from Engineering and Operations repositories
+and copy specific files to the central documentation repository.
+"""
 
 import json
 import os
@@ -335,25 +339,39 @@ def copy_files_by_pattern(source_repo_path, patterns, exclude_patterns, repo_nam
         # Find all matching files
         if "*" in source_pattern or "?" in source_pattern:
             # Use glob pattern matching
-            parent_dir = source_path_obj.parent
-            pattern_name = source_path_obj.name
-            
-            if not parent_dir.exists():
-                print(f"  [WARNING] Source directory does not exist: {parent_dir.relative_to(source_repo_path)}")
-                continue
-            
-            # Find matching files
             matching_files = []
-            if pattern_config.get("recursive", False) or "**" in source_pattern:
-                # Recursive search
+            if "**" in source_pattern:
+                # Handle recursive patterns without treating '**' as a real folder
+                prefix, _, suffix = source_pattern.partition("**")
+                base_dir = prefix.rstrip("/")
+                pattern_name = suffix.lstrip("/") or "*"
+                parent_dir = source_repo_path / base_dir if base_dir else source_repo_path
+                
+                if not parent_dir.exists():
+                    print(f"  [WARNING] Source directory does not exist: {parent_dir.relative_to(source_repo_path)}")
+                    continue
+                
                 for file_path in parent_dir.rglob(pattern_name):
                     if file_path.is_file() and not should_exclude_file(file_path, exclude_patterns):
                         matching_files.append(file_path)
             else:
-                # Non-recursive search
-                for file_path in parent_dir.glob(pattern_name):
-                    if file_path.is_file() and not should_exclude_file(file_path, exclude_patterns):
-                        matching_files.append(file_path)
+                parent_dir = source_path_obj.parent
+                pattern_name = source_path_obj.name
+                
+                if not parent_dir.exists():
+                    print(f"  [WARNING] Source directory does not exist: {parent_dir.relative_to(source_repo_path)}")
+                    continue
+                
+                if pattern_config.get("recursive", False):
+                    # Recursive search
+                    for file_path in parent_dir.rglob(pattern_name):
+                        if file_path.is_file() and not should_exclude_file(file_path, exclude_patterns):
+                            matching_files.append(file_path)
+                else:
+                    # Non-recursive search
+                    for file_path in parent_dir.glob(pattern_name):
+                        if file_path.is_file() and not should_exclude_file(file_path, exclude_patterns):
+                            matching_files.append(file_path)
         else:
             # Single file or directory
             if source_path_obj.exists():
