@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-"""
-Script to pull content from Engineering and Operations repositories
-and copy specific files to the central documentation repository.
-"""
 
 import json
 import os
@@ -513,6 +509,7 @@ def main():
         )
         
         # Use commit-based copying if available, otherwise use pattern-based
+        copied = 0
         if changed_files_list and "messaging_core_patterns" in config and config["messaging_core_patterns"]:
             print("  Copying only changed files that match patterns...")
             exclude_patterns = config.get("exclude_patterns", [])
@@ -524,7 +521,9 @@ def main():
                 "messaging-core"
             )
             total_copied += copied
-        else:
+
+        # Fallback if commit-based copy finds nothing (common on squash/merge commits)
+        if copied == 0:
             # Fallback to pattern-based or static mapping (for scheduled/push/manual triggers)
             # Process static file mappings (backward compatibility)
             if "messaging_core_paths" in config and config["messaging_core_paths"]:
@@ -570,6 +569,7 @@ def main():
         )
         
         # Use commit-based copying if available, otherwise use pattern-based
+        copied = 0
         if changed_files_list and "virtual_golf_game_api_patterns" in config and config["virtual_golf_game_api_patterns"]:
             print("  Copying only changed files that match patterns...")
             exclude_patterns = config.get("exclude_patterns", [])
@@ -581,7 +581,9 @@ def main():
                 "virtual-golf-game-api"
             )
             total_copied += copied
-        else:
+
+        # Fallback if commit-based copy finds nothing (common on squash/merge commits)
+        if copied == 0:
             # Fallback to pattern-based or static mapping (for scheduled/push/manual triggers)
             # Process static file mappings (backward compatibility)
             if "virtual_golf_game_api_paths" in config and config["virtual_golf_game_api_paths"]:
