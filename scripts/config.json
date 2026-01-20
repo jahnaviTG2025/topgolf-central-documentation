@@ -4,7 +4,7 @@
   "messaging_core_patterns": [
     {
       "source": "docs/**/*.md",
-      "destination": "docs/engineering/",
+      "destination": "engineering/",
       "recursive": true,
       "description": "Copy all markdown files from messaging-core docs/"
     }
@@ -15,7 +15,7 @@
   "virtual_golf_game_api_patterns": [
     {
       "source": "docs/**/*.md",
-      "destination": "docs/operations/",
+      "destination": "operations/",
       "recursive": true,
       "description": "Copy all markdown files from virtual-golf-game-api docs/"
     }
@@ -29,3 +29,4 @@
     "README.md"
   ]
 }
+
