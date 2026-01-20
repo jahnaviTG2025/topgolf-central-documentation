@@ -2,8 +2,5 @@
 # Keep a stable top-level order and auto-include new sections.
 nav:
   - index.md
-  - getting-started/
-  - engineering/
-  - operations/
-  - asyncapi/
   - ...
+
