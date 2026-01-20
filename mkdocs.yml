@@ -1,15 +1,16 @@
-site_name: TopgolfCentral Documentation
-site_description: Central documentation repository pulling content from Engineering and Operations repos
+site_name: TopGolf Central Documentation
+site_description: Central documentation repository pulling content from messaging-core and virtual-golf-game-api repos
 site_author: Documentation Team
-site_url: https://topgolf.github.io/central-documentation/
+# Update this to your S3 website URL or CloudFront URL
+site_url: http://your-bucket-name.s3-website-us-east-1.amazonaws.com/
 
 # Repository information for "Edit on GitHub" links
-repo_name: topgolf/central-documentation
-repo_url: https://github.com/your-org/central-documentation
+repo_name: jahnaviTG2025/topgolf-central-documentation
+repo_url: https://github.com/jahnaviTG2025/topgolf-central-documentation
 edit_uri: edit/main/docs/
 
 # Copyright
-copyright: Copyright &copy; 2025 Global Merssaging Platform Team
+copyright: Copyright &copy; 2025 Documentation Team
 
 # Theme
 theme:
@@ -65,7 +66,7 @@ markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
   - pymdownx.emoji:
-      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_index: !!python/name:materialx.emoji.twemoji
       emoji_generator: !!python/name:materialx.emoji.to_svg
   - admonition
   - attr_list
@@ -75,21 +76,6 @@ markdown_extensions:
       permalink: true
       toc_depth: 3
 
-# Navigation structure
-nav:
-  - Home: index.md
-  - Getting Started:
-    - Overview: getting-started/overview.md
-    - Setup: getting-started/setup.md
-  - Messaging Core:
-    - Overview: messaging-core/index.md
-    - 'API Documentation': messaging-core/api.md
-    - 'Architecture': messaging-core/architecture.md
-  - Game Team:
-    - Overview: game-technology/index.md
-    - 'API Documentation': game-technology/api.md
-    - 'Architecture': game-technology/architecture.md
-
 # Extra files
 extra_css:
   - stylesheets/extra.css
@@ -98,5 +84,5 @@ extra_css:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/your-org
+      link: https://github.com/jahnaviTG2025
 
