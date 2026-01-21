@@ -48,7 +48,93 @@ plugins:
       lang: en
   - git-revision-date-localized:
       enable_creation_date: true
-  - awesome-pages
+
+# Extensions
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+
+# Extra files
+extra_css:
+  - stylesheets/extra.css
+
+# Extra context
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/jahnaviTG2025
+
+site_name: TopGolf Central Documentation
+site_description: Central documentation repository pulling content from messaging-core and virtual-golf-game-api repos
+site_author: Documentation Team
+# Update this to your S3 website URL or CloudFront URL
+site_url: http://your-bucket-name.s3-website-us-east-1.amazonaws.com/
+
+# Repository information for "Edit on GitHub" links
+repo_name: jahnaviTG2025/topgolf-central-documentation
+repo_url: https://github.com/jahnaviTG2025/topgolf-central-documentation
+edit_uri: edit/main/docs/
+
+# Copyright
+copyright: Copyright &copy; 2025 Documentation Team
+
+# Theme
+theme:
+  name: material
+  palette:
+    # Light mode
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.annotate
+    - content.code.copy
+  icon:
+    repo: fontawesome/brands/github
+
+# Plugins
+plugins:
+  - search:
+      lang: en
+  - git-revision-date-localized:
+      enable_creation_date: true
 
 # Extensions
 markdown_extensions:
