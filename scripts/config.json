@@ -4,9 +4,45 @@
   "messaging_core_patterns": [
     {
       "source": "docs/**/*.md",
-      "destination": "engineering/",
+      "destination": "messaging-core/",
       "recursive": true,
       "description": "Copy all markdown files from messaging-core docs/"
+    },
+    {
+      "source": "docs/**/*.yml",
+      "destination": "messaging-core/specs/",
+      "recursive": true,
+      "description": "Copy YAML files from messaging-core docs/"
+    },
+    {
+      "source": "docs/**/*.yaml",
+      "destination": "messaging-core/specs/",
+      "recursive": true,
+      "description": "Copy YAML files from messaging-core docs/"
+    },
+    {
+      "source": "api-specs/**/*.yml",
+      "destination": "messaging-core/specs/",
+      "recursive": true,
+      "description": "Copy YAML files from messaging-core api-specs/"
+    },
+    {
+      "source": "api-specs/**/*.yaml",
+      "destination": "messaging-core/specs/",
+      "recursive": true,
+      "description": "Copy YAML files from messaging-core api-specs/"
+    },
+    {
+      "source": "*.yml",
+      "destination": "messaging-core/specs/",
+      "recursive": false,
+      "description": "Copy root-level YAML files from messaging-core"
+    },
+    {
+      "source": "*.yaml",
+      "destination": "messaging-core/specs/",
+      "recursive": false,
+      "description": "Copy root-level YAML files from messaging-core"
     }
   ],
   
@@ -15,9 +51,45 @@
   "virtual_golf_game_api_patterns": [
     {
       "source": "docs/**/*.md",
-      "destination": "operations/",
+      "destination": "virtual-golf-game-api/",
       "recursive": true,
       "description": "Copy all markdown files from virtual-golf-game-api docs/"
+    },
+    {
+      "source": "docs/**/*.yml",
+      "destination": "virtual-golf-game-api/specs/",
+      "recursive": true,
+      "description": "Copy YAML files from virtual-golf-game-api docs/"
+    },
+    {
+      "source": "docs/**/*.yaml",
+      "destination": "virtual-golf-game-api/specs/",
+      "recursive": true,
+      "description": "Copy YAML files from virtual-golf-game-api docs/"
+    },
+    {
+      "source": "api-specs/**/*.yml",
+      "destination": "virtual-golf-game-api/specs/",
+      "recursive": true,
+      "description": "Copy YAML files from virtual-golf-game-api api-specs/"
+    },
+    {
+      "source": "api-specs/**/*.yaml",
+      "destination": "virtual-golf-game-api/specs/",
+      "recursive": true,
+      "description": "Copy YAML files from virtual-golf-game-api api-specs/"
+    },
+    {
+      "source": "*.yml",
+      "destination": "virtual-golf-game-api/specs/",
+      "recursive": false,
+      "description": "Copy root-level YAML files from virtual-golf-game-api"
+    },
+    {
+      "source": "*.yaml",
+      "destination": "virtual-golf-game-api/specs/",
+      "recursive": false,
+      "description": "Copy root-level YAML files from virtual-golf-game-api"
     }
   ],
   
