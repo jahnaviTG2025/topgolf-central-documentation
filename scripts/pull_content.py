@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""
-Script to pull content from Engineering and Operations repositories
-and copy specific files to the central documentation repository.
-"""
+
 
 import json
 import os
