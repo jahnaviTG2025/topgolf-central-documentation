@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-
+"""
+Script to pull content from Engineering and Operations repositories
+and copy specific files to the central documentation repository.
+"""
 
 import json
 import os
@@ -183,6 +186,37 @@ def should_exclude_file(file_path, exclude_patterns):
     return False
 
 
+def is_yaml_file(file_path):
+    """Return True for YAML files."""
+    suffix = file_path.suffix.lower()
+    return suffix in {".yml", ".yaml"}
+
+
+def write_yaml_markdown(source_file, dest_md, relative_source):
+    """Create a readable Markdown wrapper for YAML content."""
+    try:
+        yaml_content = source_file.read_text(encoding="utf-8", errors="ignore")
+    except OSError as e:
+        print(f"  [ERROR] Failed to read {relative_source}: {e}")
+        return False
+
+    dest_md.parent.mkdir(parents=True, exist_ok=True)
+    title = f"{source_file.name}"
+    markdown = (
+        f"# {title}\n\n"
+        f"Source: `{relative_source}`\n\n"
+        "```yaml\n"
+        f"{yaml_content}\n"
+        "```\n"
+    )
+    try:
+        dest_md.write_text(markdown, encoding="utf-8")
+        return True
+    except OSError as e:
+        print(f"  [ERROR] Failed to write {dest_md}: {e}")
+        return False
+
+
 def match_file_to_pattern(file_path, pattern_config, exclude_patterns):
     """Check if a file matches a pattern configuration"""
     source_pattern = pattern_config.get("source")
@@ -300,11 +334,17 @@ def copy_changed_files(source_repo_path, changed_files_list, patterns, exclude_p
         # Ensure destination directory exists
         dest_file.parent.mkdir(parents=True, exist_ok=True)
         
-        # Copy file
+        # Copy file (and render YAML to Markdown for MkDocs)
         try:
             shutil.copy2(source_file, dest_file)
             print(f"  [OK] Copied {relative_path} -> {dest_file.relative_to(docs_path)}")
             copied_count += 1
+
+            if is_yaml_file(source_file):
+                dest_md = dest_file.with_suffix(dest_file.suffix + ".md")
+                if write_yaml_markdown(source_file, dest_md, relative_path):
+                    print(f"  [OK] Rendered {relative_path} -> {dest_md.relative_to(docs_path)}")
+                    copied_count += 1
         except Exception as e:
             print(f"  [ERROR] Failed to copy {relative_path}: {e}")
     
@@ -395,11 +435,17 @@ def copy_files_by_pattern(source_repo_path, patterns, exclude_patterns, repo_nam
             # Ensure destination directory exists
             dest_file.parent.mkdir(parents=True, exist_ok=True)
             
-            # Copy file
+            # Copy file (and render YAML to Markdown for MkDocs)
             try:
                 shutil.copy2(source_file, dest_file)
                 print(f"  [OK] Copied {relative_path} -> {dest_file.relative_to(docs_path)}")
                 copied_count += 1
+
+                if is_yaml_file(source_file):
+                    dest_md = dest_file.with_suffix(dest_file.suffix + ".md")
+                    if write_yaml_markdown(source_file, dest_md, relative_path):
+                        print(f"  [OK] Rendered {relative_path} -> {dest_md.relative_to(docs_path)}")
+                        copied_count += 1
             except Exception as e:
                 print(f"  [ERROR] Failed to copy {relative_path}: {e}")
         
