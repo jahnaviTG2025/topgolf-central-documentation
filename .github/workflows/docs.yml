@@ -17,10 +17,6 @@ on:
         type: string
   repository_dispatch:
     types: [trigger-docs-update]
-  schedule:
-    # Run weekly on Monday at 2 AM UTC to pull latest content from all repos
-    # (Automatic triggers handle immediate updates, this is a fallback)
-    - cron: '0 2 * * 1'
 
 env:
   # S3 Configuration - Update these or use repository secrets
