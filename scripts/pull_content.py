@@ -334,17 +334,17 @@ def copy_changed_files(source_repo_path, changed_files_list, patterns, exclude_p
         # Ensure destination directory exists
         dest_file.parent.mkdir(parents=True, exist_ok=True)
         
-        # Copy file (and render YAML to Markdown for MkDocs)
+        # Copy file (render YAML to Markdown instead of copying raw YAML)
         try:
-            shutil.copy2(source_file, dest_file)
-            print(f"  [OK] Copied {relative_path} -> {dest_file.relative_to(docs_path)}")
-            copied_count += 1
-
             if is_yaml_file(source_file):
                 dest_md = dest_file.with_suffix(dest_file.suffix + ".md")
                 if write_yaml_markdown(source_file, dest_md, relative_path):
                     print(f"  [OK] Rendered {relative_path} -> {dest_md.relative_to(docs_path)}")
                     copied_count += 1
+            else:
+                shutil.copy2(source_file, dest_file)
+                print(f"  [OK] Copied {relative_path} -> {dest_file.relative_to(docs_path)}")
+                copied_count += 1
         except Exception as e:
             print(f"  [ERROR] Failed to copy {relative_path}: {e}")
     
@@ -435,17 +435,17 @@ def copy_files_by_pattern(source_repo_path, patterns, exclude_patterns, repo_nam
             # Ensure destination directory exists
             dest_file.parent.mkdir(parents=True, exist_ok=True)
             
-            # Copy file (and render YAML to Markdown for MkDocs)
+            # Copy file (render YAML to Markdown instead of copying raw YAML)
             try:
-                shutil.copy2(source_file, dest_file)
-                print(f"  [OK] Copied {relative_path} -> {dest_file.relative_to(docs_path)}")
-                copied_count += 1
-
                 if is_yaml_file(source_file):
                     dest_md = dest_file.with_suffix(dest_file.suffix + ".md")
                     if write_yaml_markdown(source_file, dest_md, relative_path):
                         print(f"  [OK] Rendered {relative_path} -> {dest_md.relative_to(docs_path)}")
                         copied_count += 1
+                else:
+                    shutil.copy2(source_file, dest_file)
+                    print(f"  [OK] Copied {relative_path} -> {dest_file.relative_to(docs_path)}")
+                    copied_count += 1
             except Exception as e:
                 print(f"  [ERROR] Failed to copy {relative_path}: {e}")
         
