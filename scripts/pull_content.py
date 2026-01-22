@@ -689,6 +689,20 @@ def main():
     print("  3. Build the documentation: mkdocs build")
     print("  4. Serve locally: mkdocs serve")
 
+    # Clean up any raw YAML files under docs/ to avoid mkdocs path collisions
+    docs_root = Path(__file__).parent.parent / "docs"
+    if docs_root.exists():
+        removed_yaml = 0
+        for yaml_path in docs_root.rglob("*"):
+            if yaml_path.is_file() and yaml_path.suffix.lower() in {".yml", ".yaml"}:
+                try:
+                    yaml_path.unlink()
+                    removed_yaml += 1
+                except OSError as e:
+                    print(f"[WARNING] Failed to remove {yaml_path}: {e}")
+        if removed_yaml:
+            print(f"[INFO] Removed {removed_yaml} raw YAML file(s) from docs/")
+
 
 if __name__ == "__main__":
     main()
