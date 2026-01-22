@@ -363,6 +363,8 @@ def copy_files_by_pattern(source_repo_path, patterns, exclude_patterns, repo_nam
     copied_count = 0
     
     for pattern_config in patterns:
+        if pattern_config.get("commit_only"):
+            continue
         source_pattern = pattern_config.get("source")
         dest_base = pattern_config.get("destination", "")
         description = pattern_config.get("description", "")
