@@ -1,174 +1,161 @@
-site_name: TopGolf Central Documentation
-site_description: Central documentation repository pulling content from messaging-core and virtual-golf-game-api repos
-site_author: Documentation Team
-# Update this to your S3 website URL or CloudFront URL
-site_url: http://your-bucket-name.s3-website-us-east-1.amazonaws.com/
+name: Build and Deploy Documentation to S3
 
-# Repository information for "Edit on GitHub" links
-repo_name: jahnaviTG2025/topgolf-central-documentation
-repo_url: https://github.com/jahnaviTG2025/topgolf-central-documentation
-edit_uri: edit/main/docs/
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      triggered_by:
+        description: 'Repository that triggered this build'
+        required: false
+        type: string
+  repository_dispatch:
+    types: [trigger-docs-update]
 
-# Copyright
-copyright: Copyright &copy; 2025 Documentation Team
+env:
+  # S3 Configuration - Update these or use repository secrets
+  AWS_REGION: us-east-1
+  S3_BUCKET: ${{ secrets.S3_BUCKET_NAME }}
+  CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
 
-# Theme
-theme:
-  name: material
-  palette:
-    # Light mode
-    - scheme: default
-      primary: indigo
-      accent: indigo
-      toggle:
-        icon: material/brightness-7
-        name: Switch to dark mode
-    # Dark mode
-    - scheme: slate
-      primary: indigo
-      accent: indigo
-      toggle:
-        icon: material/brightness-4
-        name: Switch to light mode
-  features:
-    - navigation.tabs
-    - navigation.sections
-    - navigation.expand
-    - navigation.top
-    - search.suggest
-    - search.highlight
-    - content.code.annotate
-    - content.code.copy
-  icon:
-    repo: fontawesome/brands/github
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      id-token: write
+    
+    steps:
+      - name: Checkout central documentation repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-# Plugins
-plugins:
-  - search:
-      lang: en
-  - git-revision-date-localized:
-      enable_creation_date: true
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-# Extensions
-markdown_extensions:
-  - pymdownx.highlight:
-      anchor_linenums: true
-  - pymdownx.inlinehilite
-  - pymdownx.snippets
-  - pymdownx.superfences:
-      custom_fences:
-        - name: mermaid
-          class: mermaid
-          format: !!python/name:pymdownx.superfences.fence_code_format
-  - pymdownx.tabbed:
-      alternate_style: true
-  - pymdownx.tasklist:
-      custom_checkbox: true
-  - pymdownx.emoji:
-      emoji_index: !!python/name:materialx.emoji.twemoji
-      emoji_generator: !!python/name:materialx.emoji.to_svg
-  - admonition
-  - attr_list
-  - md_in_html
-  - tables
-  - toc:
-      permalink: true
-      toc_depth: 3
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-# Extra files
-extra_css:
-  - stylesheets/extra.css
+      - name: Log trigger information
+        run: |
+          echo "=== Workflow Trigger Information ==="
+          echo "Event: ${{ github.event_name }}"
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "Triggered by external repository push"
+            echo "Repository: ${{ github.event.client_payload.repository || 'unknown' }}"
+            echo "Branch: ${{ github.event.client_payload.branch || 'unknown' }}"
+            echo "Commit: ${{ github.event.client_payload.commit || 'unknown' }}"
+            echo "Changed files: ${{ github.event.client_payload.changed_files || 'unknown' }}"
+            echo "AsyncAPI changed: ${{ github.event.client_payload.asyncapi_changed || 'false' }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manually triggered"
+            echo "Triggered by input: ${{ inputs.triggered_by || 'manual' }}"
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "Scheduled weekly update (fallback)"
+          fi
 
-# Extra context
-extra:
-  social:
-    - icon: fontawesome/brands/github
-      link: https://github.com/jahnaviTG2025
+      - name: Determine trigger repository and commit info
+        id: trigger_repo
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            TRIGGER_REPO="${{ github.event.client_payload.repository }}"
+            TRIGGER_COMMIT="${{ github.event.client_payload.commit }}"
+            TRIGGER_CHANGED_FILES="${{ github.event.client_payload.changed_files }}"
+            echo "repository=$TRIGGER_REPO" >> $GITHUB_OUTPUT
+            echo "commit=$TRIGGER_COMMIT" >> $GITHUB_OUTPUT
+            echo "changed_files=$TRIGGER_CHANGED_FILES" >> $GITHUB_OUTPUT
+            echo "Triggered by repository: $TRIGGER_REPO"
+            echo "Commit SHA: $TRIGGER_COMMIT"
+            echo "Changed files: $TRIGGER_CHANGED_FILES"
+          else
+            echo "repository=" >> $GITHUB_OUTPUT
+            echo "commit=" >> $GITHUB_OUTPUT
+            echo "changed_files=" >> $GITHUB_OUTPUT
+            echo "Not triggered by repository_dispatch, will pull from all repos using patterns"
+          fi
 
-site_name: TopGolf Central Documentation
-site_description: Central documentation repository pulling content from messaging-core and virtual-golf-game-api repos
-site_author: Documentation Team
-# Update this to your S3 website URL or CloudFront URL
-site_url: http://your-bucket-name.s3-website-us-east-1.amazonaws.com/
+      - name: Pull content from external repositories
+        env:
+          # Authentication tokens for private repositories
+          # REQUIRED if messaging-core or virtual-golf-game-api are private repos
+          MESSAGING_CORE_REPO_TOKEN: ${{ secrets.MESSAGING_CORE_REPO_TOKEN }}
+          VIRTUAL_GOLF_GAME_API_REPO_TOKEN: ${{ secrets.VIRTUAL_GOLF_GAME_API_REPO_TOKEN }}
+          # Pass the triggering repository, commit, and changed files
+          TRIGGER_REPOSITORY: ${{ steps.trigger_repo.outputs.repository }}
+          TRIGGER_COMMIT: ${{ steps.trigger_repo.outputs.commit }}
+          TRIGGER_CHANGED_FILES: ${{ steps.trigger_repo.outputs.changed_files }}
+        run: |
+          echo "Checking authentication tokens..."
+          if [ -z "$MESSAGING_CORE_REPO_TOKEN" ] && [ -z "$VIRTUAL_GOLF_GAME_API_REPO_TOKEN" ]; then
+            echo "⚠️  Warning: No repository tokens configured"
+            echo "If repositories are private, add MESSAGING_CORE_REPO_TOKEN and/or VIRTUAL_GOLF_GAME_API_REPO_TOKEN secrets"
+          fi
+          python scripts/pull_content.py
 
-# Repository information for "Edit on GitHub" links
-repo_name: jahnaviTG2025/topgolf-central-documentation
-repo_url: https://github.com/jahnaviTG2025/topgolf-central-documentation
-edit_uri: edit/main/docs/
+      - name: Build documentation
+        run: |
+          mkdocs build --strict
 
-# Copyright
-copyright: Copyright &copy; 2025 Documentation Team
+      - name: Configure AWS credentials
+        if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'repository_dispatch' || github.event_name == 'schedule')
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          # Option 1: Use OIDC (recommended for GitHub Actions)
+          # role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          # aws-region: ${{ env.AWS_REGION }}
+          
+          # Option 2: Use Access Keys (simpler setup)
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-# Theme
-theme:
-  name: material
-  palette:
-    # Light mode
-    - scheme: default
-      primary: indigo
-      accent: indigo
-      toggle:
-        icon: material/brightness-7
-        name: Switch to dark mode
-    # Dark mode
-    - scheme: slate
-      primary: indigo
-      accent: indigo
-      toggle:
-        icon: material/brightness-4
-        name: Switch to light mode
-  features:
-    - navigation.tabs
-    - navigation.sections
-    - navigation.expand
-    - navigation.top
-    - search.suggest
-    - search.highlight
-    - content.code.annotate
-    - content.code.copy
-  icon:
-    repo: fontawesome/brands/github
+      - name: Deploy to S3
+        if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'repository_dispatch' || github.event_name == 'schedule')
+        run: |
+          # Sync built site to S3 bucket
+          aws s3 sync ./site s3://${{ env.S3_BUCKET }} \
+            --delete \
+            --cache-control "max-age=86400" \
+            --exclude "*.html" \
+            --exclude "sitemap.xml"
+          
+          # Upload HTML files with shorter cache
+          aws s3 sync ./site s3://${{ env.S3_BUCKET }} \
+            --cache-control "max-age=3600" \
+            --content-type "text/html" \
+            --exclude "*" \
+            --include "*.html"
+          
+          # Upload sitemap
+          aws s3 cp ./site/sitemap.xml s3://${{ env.S3_BUCKET }}/sitemap.xml \
+            --cache-control "max-age=3600" \
+            --content-type "application/xml" || true
+          
+          echo "Documentation deployed to S3 bucket: ${{ env.S3_BUCKET }}"
 
-# Plugins
-plugins:
-  - search:
-      lang: en
-  - git-revision-date-localized:
-      enable_creation_date: true
+      - name: Invalidate CloudFront cache
+        if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'repository_dispatch' || github.event_name == 'schedule') && env.CLOUDFRONT_DISTRIBUTION_ID != ''
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ env.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
+          echo "CloudFront cache invalidated"
 
-# Extensions
-markdown_extensions:
-  - pymdownx.highlight:
-      anchor_linenums: true
-  - pymdownx.inlinehilite
-  - pymdownx.snippets
-  - pymdownx.superfences:
-      custom_fences:
-        - name: mermaid
-          class: mermaid
-          format: !!python/name:pymdownx.superfences.fence_code_format
-  - pymdownx.tabbed:
-      alternate_style: true
-  - pymdownx.tasklist:
-      custom_checkbox: true
-  - pymdownx.emoji:
-      emoji_index: !!python/name:materialx.emoji.twemoji
-      emoji_generator: !!python/name:materialx.emoji.to_svg
-  - admonition
-  - attr_list
-  - md_in_html
-  - tables
-  - toc:
-      permalink: true
-      toc_depth: 3
-
-# Extra files
-extra_css:
-  - stylesheets/extra.css
-
-# Extra context
-extra:
-  social:
-    - icon: fontawesome/brands/github
-      link: https://github.com/jahnaviTG2025
-
+      - name: Build documentation (PR preview)
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "Documentation built successfully. Review the changes in the PR."
+          echo "Site contents:"
+          ls -la ./site/
