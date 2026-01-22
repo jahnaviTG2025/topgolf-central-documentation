@@ -43,6 +43,13 @@
       "destination": "messaging-core/specs/",
       "recursive": false,
       "description": "Copy root-level YAML files from messaging-core"
+    },
+    {
+      "source": "**/*",
+      "destination": "messaging-core/",
+      "recursive": true,
+      "commit_only": true,
+      "description": "Copy any changed files from messaging-core"
     }
   ],
   
@@ -90,14 +97,19 @@
       "destination": "virtual-golf-game-api/specs/",
       "recursive": false,
       "description": "Copy root-level YAML files from virtual-golf-game-api"
+    },
+    {
+      "source": "**/*",
+      "destination": "virtual-golf-game-api/",
+      "recursive": true,
+      "commit_only": true,
+      "description": "Copy any changed files from virtual-golf-game-api"
     }
   ],
   
   "temp_dir": ".temp_repos",
   "exclude_patterns": [
     "*.tmp",
-    "*.bak",
-    ".*",
-    "README.md"
+    "*.bak"
   ]
 }
